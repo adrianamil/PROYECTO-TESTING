@@ -5,6 +5,7 @@
 package sistema_biblioteca;
 import java.util.Scanner;
 import java.sql.*;
+import java.time.temporal.ChronoUnit;
 /**
  *
  * @author User
@@ -246,7 +247,6 @@ public class Sistema_Biblioteca {
             }
         }
         
-        // VERIFICAR SI YA EXISTE UN LIBRO EN ALMACEN
         if (validarLibroBiblioteca("almacen", "isbn_libro", "id_biblioteca", isbnLibro, idBiblioteca)){
             System.out.println("Ya existen libros en el almacen de esa biblioteca");
             return;
@@ -262,9 +262,9 @@ public class Sistema_Biblioteca {
             
             int affectedRow = pstmt.executeUpdate();
             if (affectedRow > 0){
-                System.out.println("Se registro la nueva biblioteca");
+                System.out.println("Se registro el libro en el almacen de la biblioteca");
             }else{
-                System.out.println("No se pudo registrar la nueva biblioteca");
+                System.out.println("No se pudo registro el libro en el almacen de la biblioteca");
             }
         }
     }
@@ -392,21 +392,21 @@ public class Sistema_Biblioteca {
 
                 Date fechaPrestamo = null;
                 while (fechaPrestamo == null) {
-                    System.out.print("Fecha de préstamo (YYYY-MM-DD): ");
+                    System.out.print("Fecha de prestamo (YYYY-MM-DD): ");
                     try {
                         fechaPrestamo = Date.valueOf(scanner.nextLine());
                     } catch (IllegalArgumentException e) {
-                        System.out.println("Formato de fecha inválido. Use YYYY-MM-DD");
+                        System.out.println("Formato de fecha invalido. Use YYYY-MM-DD");
                     }
                 }
 
                 Date fechaDevolucionEsperada = null;
                 while (fechaDevolucionEsperada == null){
-                    System.out.print("Fecha esperada de devolución (YYYY-MM-DD): ");
+                    System.out.print("Fecha esperada de devolucion (YYYY-MM-DD): ");
                     try {
                         fechaDevolucionEsperada = Date.valueOf(scanner.nextLine());
                     } catch (IllegalArgumentException e){
-                        System.out.println("Formato de fecha inválido. Use YYYY-MM-DD");
+                        System.out.println("Formato de fecha invalido. Use YYYY-MM-DD");
                     }
                 }
                 
@@ -469,7 +469,6 @@ public class Sistema_Biblioteca {
     private static void registrarDevolucion() throws SQLException {
         System.out.println("\nREGISTRAR DEVOLUCION");
 
-        // Validación del ID de préstamo
         int idPrestamo = 0;
         while (true) {
             System.out.print("Ingrese el ID del prestamo: ");
@@ -485,7 +484,6 @@ public class Sistema_Biblioteca {
             }
         }
 
-        // Obtener la fecha de préstamo primero
         Date fechaPrestamo = null;
         try (Connection conn = Conexion.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
@@ -495,13 +493,12 @@ public class Sistema_Biblioteca {
             ResultSet rs = stmt.executeQuery();
 
             if (!rs.next()) {
-                System.out.println("Error: El préstamo ya fue devuelto o no existe");
+                System.out.println("Error: El prestamo ya fue devuelto");
                 return;
             }
             fechaPrestamo = rs.getDate("fecha_prestamo");
         }
 
-        // Validación de fecha de devolución
         Date fechaDevolucionReal = null;
         while (fechaDevolucionReal == null) {
             System.out.print("Fecha de devolucion (actual en YYYY-MM-DD): ");
@@ -509,18 +506,8 @@ public class Sistema_Biblioteca {
                 String input = scanner.nextLine();
                 fechaDevolucionReal = Date.valueOf(input);
 
-                // Validar que no sea anterior al préstamo
                 if (fechaDevolucionReal.before(fechaPrestamo)) {
-                    System.out.println("Error: La fecha de devolución no puede ser anterior a la fecha de préstamo (" 
-                        + fechaPrestamo + ")");
-                    fechaDevolucionReal = null; // Reiniciar para volver a pedir
-                    continue;
-                }
-
-                // Validar que no sea fecha futura
-                Date hoy = new Date(System.currentTimeMillis());
-                if (fechaDevolucionReal.after(hoy)) {
-                    System.out.println("Error: La fecha de devolución no puede ser futura");
+                    System.out.println("Error: La fecha de devolucion no puede ser anterior a la fecha de prestamo (" + fechaPrestamo + ")");
                     fechaDevolucionReal = null;
                     continue;
                 }
@@ -530,7 +517,6 @@ public class Sistema_Biblioteca {
             }
         }
 
-        // Proceso de devolución
         try (Connection conn = Conexion.getConnection()) {
             conn.setAutoCommit(false);
 
@@ -554,7 +540,6 @@ public class Sistema_Biblioteca {
                     fechaEsperadaDevolucion = rs.getDate("fecha_devolucion_esperada");
                 }
 
-                // Calcular días de retraso
                 long diasRetraso = ChronoUnit.DAYS.between(
                     fechaEsperadaDevolucion.toLocalDate(),
                     fechaDevolucionReal.toLocalDate()
@@ -571,7 +556,6 @@ public class Sistema_Biblioteca {
                     updateStmt.executeUpdate();
                 }
 
-                // Actualizar stock
                 String updateStockSQL = "UPDATE almacen SET stock = stock + 1 WHERE isbn_libro = ? AND id_biblioteca = ?";
                 try (PreparedStatement stockStmt = conn.prepareStatement(updateStockSQL)) {
                     stockStmt.setInt(1, isbnLibro);
@@ -580,7 +564,7 @@ public class Sistema_Biblioteca {
                 }
 
                 conn.commit();
-                System.out.println("Devolución registrada exitosamente y stock actualizado");
+                System.out.println("Devolucion registrada exitosamente y stock actualizado");
                 if (diasRetraso > 0) {
                     System.out.printf("Multa aplicada por %d días de retraso: $%.2f%n", diasRetraso, multa);
                 }
@@ -595,7 +579,7 @@ public class Sistema_Biblioteca {
     }
     
     private static void consultarPrestamosActivos() throws SQLException {
-        System.out.println("\nPRÉSTAMOS ACTIVOS");
+        System.out.println("\nPRESTAMOS ACTIVOS");
         
         String sql = "SELECT p.id_prestamo, c.nombre AS nombre_cliente, c.apellido AS apellido_cliente, " +
                      "l.nombre AS nombre_libro, p.fecha_prestamo, p.fecha_devolucion_esperada " +
@@ -608,11 +592,11 @@ public class Sistema_Biblioteca {
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             
-            System.out.printf("%-8s %-20s %-30s %-12s %-12s%n", "ID", "Cliente", "Libro", "Prestamo", "Devolucion");
-            System.out.println("----------------------------------------------------------------");
+            System.out.printf("%-8s %-20s %-30s %-20s %-20s%n", "ID", "USUARIO", "LIBRO", "FECHA PRESTAMO", "FECHA DEVOLUCION");
+            System.out.println("--------------------------------------------------------------------------------------------------");
             
             while (rs.next()) {
-                System.out.printf("%-8d %-20s %-30s %-12s %-12s%n", rs.getInt("id_prestamo"), rs.getString("nombre_cliente") + " " + rs.getString("apellido_cliente"), rs.getString("nombre_libro"), rs.getDate("fecha_prestamo"), rs.getDate("fecha_devolucion_esperada"));
+                System.out.printf("%-8d %-20s %-30s %-20s %-20s%n", rs.getInt("id_prestamo"), rs.getString("nombre_cliente") + " " + rs.getString("apellido_cliente"), rs.getString("nombre_libro"), rs.getDate("fecha_prestamo"), rs.getDate("fecha_devolucion_esperada"));
             }
         }
     }
