@@ -287,7 +287,6 @@ public class Sistema_Biblioteca {
     private static void registrarPrestamo() throws SQLException {
         System.out.println("\nREGISTRAR NUEVO PRESTAMO");
 
-        // Validar DNI del cliente
         int dniCliente = 0;
         while (true) {
             System.out.print("DNI del cliente (8 digitos): ");
@@ -307,7 +306,6 @@ public class Sistema_Biblioteca {
             }
         }
 
-        // Validar ISBN del libro (6 dígitos)
         int isbnLibro = 0;
         while (true) {
             System.out.print("ISBN del libro (6 digitos): ");
@@ -328,7 +326,6 @@ public class Sistema_Biblioteca {
             }
         }
 
-        // Validar ID de biblioteca
         int idBiblioteca = 0;
         while (true) {
             System.out.print("ID de la biblioteca (4 digitos): ");
@@ -349,19 +346,15 @@ public class Sistema_Biblioteca {
             }
         }
 
-        // Validar existencia en base de datos
-
         if (!validarLibroEnBiblioteca(isbnLibro, idBiblioteca)) {
             System.out.println("Error: El libro no existe en la biblioteca especificada");
             return;
         }
 
-        // Verificar stock disponible primero
         try (Connection conn = Conexion.getConnection()) {
-            conn.setAutoCommit(false); // Iniciar transacción
+            conn.setAutoCommit(false);
 
             try {
-                // 1. Verificar si hay stock disponible
                 String checkStockSQL = "SELECT stock FROM almacen WHERE isbn_libro = ? AND id_biblioteca = ?";
                 try (PreparedStatement checkStmt = conn.prepareStatement(checkStockSQL)) {
                     checkStmt.setInt(1, isbnLibro);
@@ -380,7 +373,6 @@ public class Sistema_Biblioteca {
                     }
                 }
 
-                // 2. Disminuir el stock
                 String updateStockSQL = "UPDATE almacen SET stock = stock - 1 WHERE isbn_libro = ? AND id_biblioteca = ? AND stock > 0";
                 try (PreparedStatement updateStmt = conn.prepareStatement(updateStockSQL)) {
                     updateStmt.setInt(1, isbnLibro);
@@ -394,7 +386,6 @@ public class Sistema_Biblioteca {
                     }
                 }
 
-                // 3. Registrar el préstamo
                 String insertPrestamoSQL = "INSERT INTO prestamo (dni_cliente, isbn_libro, id_biblioteca, "
                         + "fecha_prestamo, fecha_devolucion_esperada, estado) "
                         + "VALUES (?, ?, ?, ?, ?, 'activo')";
@@ -429,19 +420,17 @@ public class Sistema_Biblioteca {
                     pstmt.executeUpdate();
                 }
 
-                conn.commit(); // Confirmar transacción
                 System.out.println("Prestamo registrado exitosamente");
 
             } catch (SQLException e) {
-                conn.rollback(); // Revertir en caso de error
+                conn.rollback();
                 System.err.println("Error al momento de realizar el prestamo: " + e.getMessage());
             } finally {
-                conn.setAutoCommit(true); // Restaurar auto-commit
+                conn.setAutoCommit(true);
             }
         }
     }
     
-    // VERIFICAR SI YA HAY LIBROS EN UNA BIBLIOTECA
     private static boolean validarLibroBiblioteca(String tabla, String columna1, String columna2, int valor1, int valor2) throws SQLException {
         String sql = "SELECT 1 FROM " + tabla + " WHERE " + columna1 + " = ? " + " AND " + columna2 + " = ?";
         try (Connection conn = Conexion.getConnection();
@@ -454,19 +443,17 @@ public class Sistema_Biblioteca {
         }
     }
     
-    // Método auxiliar para validar existencia en cualquier tabla
     private static boolean validarExistencia(String tabla, String columna, int valor) throws SQLException {
         String sql = "SELECT 1 FROM " + tabla + " WHERE " + columna + " = ?";
         try (Connection conn = Conexion.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, valor);
             try (ResultSet rs = pstmt.executeQuery()) {
-                return rs.next(); // Retorna true si existe, false si no
+                return rs.next();
             }
         }
     }
     
-    // Método específico para validar libro en biblioteca
     private static boolean validarLibroEnBiblioteca(int isbnLibro, int idBiblioteca) throws SQLException {
         String sql = "SELECT 1 FROM almacen WHERE isbn_libro = ? AND id_biblioteca = ?";
         try (Connection conn = Conexion.getConnection();
@@ -479,52 +466,112 @@ public class Sistema_Biblioteca {
         }
     }
     
-    private static void registrarDevolucion() throws SQLException { //FALTA ARREGLAR ESTE
-        System.out.println("\nREGISTRAR DEVOLUCIÓN");
+    private static void registrarDevolucion() throws SQLException {
+        System.out.println("\nREGISTRAR DEVOLUCION");
 
-        System.out.print("ID del prestamo: ");
-        int idPrestamo = scanner.nextInt();
+        // Validación del ID de préstamo
+        int idPrestamo = 0;
+        while (true) {
+            System.out.print("Ingrese el ID del prestamo: ");
+            try {
+                idPrestamo = Integer.parseInt(scanner.nextLine());
+                if (!validarExistencia("prestamo", "id_prestamo", idPrestamo)) {
+                    System.out.println("Error: Prestamo no encontrado");
+                    continue;
+                }
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Error: Debe ingresar solo numeros para el ID del prestamo");
+            }
+        }
 
-        System.out.print("Fecha de devolucion (actual en YYYY-MM-DD): ");
-        String fechaDevolucionRealStr = scanner.next();
-        Date fechaDevolucionReal = Date.valueOf(fechaDevolucionRealStr);
+        // Obtener la fecha de préstamo primero
+        Date fechaPrestamo = null;
+        try (Connection conn = Conexion.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                 "SELECT fecha_prestamo FROM prestamo WHERE id_prestamo = ? AND estado = 'activo'")) {
 
+            stmt.setInt(1, idPrestamo);
+            ResultSet rs = stmt.executeQuery();
+
+            if (!rs.next()) {
+                System.out.println("Error: El préstamo ya fue devuelto o no existe");
+                return;
+            }
+            fechaPrestamo = rs.getDate("fecha_prestamo");
+        }
+
+        // Validación de fecha de devolución
+        Date fechaDevolucionReal = null;
+        while (fechaDevolucionReal == null) {
+            System.out.print("Fecha de devolucion (actual en YYYY-MM-DD): ");
+            try {
+                String input = scanner.nextLine();
+                fechaDevolucionReal = Date.valueOf(input);
+
+                // Validar que no sea anterior al préstamo
+                if (fechaDevolucionReal.before(fechaPrestamo)) {
+                    System.out.println("Error: La fecha de devolución no puede ser anterior a la fecha de préstamo (" 
+                        + fechaPrestamo + ")");
+                    fechaDevolucionReal = null; // Reiniciar para volver a pedir
+                    continue;
+                }
+
+                // Validar que no sea fecha futura
+                Date hoy = new Date(System.currentTimeMillis());
+                if (fechaDevolucionReal.after(hoy)) {
+                    System.out.println("Error: La fecha de devolución no puede ser futura");
+                    fechaDevolucionReal = null;
+                    continue;
+                }
+
+            } catch (IllegalArgumentException e) {
+                System.out.println("Formato de fecha invalido (YYYY-MM-DD)");
+            }
+        }
+
+        // Proceso de devolución
         try (Connection conn = Conexion.getConnection()) {
-            conn.setAutoCommit(false); // Iniciar transacción
+            conn.setAutoCommit(false);
 
             try {
-                // 1. Obtener datos del préstamo
-                String getPrestamoSQL = "SELECT isbn_libro, id_biblioteca FROM prestamo WHERE id_prestamo = ? AND estado = 'activo'";
+                String getPrestamoSQL = "SELECT isbn_libro, id_biblioteca, fecha_devolucion_esperada " +
+                                        "FROM prestamo WHERE id_prestamo = ? AND estado = 'activo'";
                 int isbnLibro, idBiblioteca;
+                Date fechaEsperadaDevolucion;
 
                 try (PreparedStatement getStmt = conn.prepareStatement(getPrestamoSQL)) {
                     getStmt.setInt(1, idPrestamo);
                     ResultSet rs = getStmt.executeQuery();
 
                     if (!rs.next()) {
-                        System.out.println("Préstamo no encontrado o ya fue devuelto");
+                        System.out.println("El prestamo ya fue devuelto");
                         return;
                     }
 
                     isbnLibro = rs.getInt("isbn_libro");
                     idBiblioteca = rs.getInt("id_biblioteca");
+                    fechaEsperadaDevolucion = rs.getDate("fecha_devolucion_esperada");
                 }
 
-                // 2. Actualizar el préstamo
-                String updatePrestamoSQL = "UPDATE prestamo SET fecha_devolucion_real = ?, estado = 'devuelto', "
-                        + "multa = CASE WHEN ? > fecha_devolucion_esperada THEN "
-                        + "DATEDIFF(?, fecha_devolucion_esperada) * 5.00 ELSE 0.00 END "
-                        + "WHERE id_prestamo = ?";
+                // Calcular días de retraso
+                long diasRetraso = ChronoUnit.DAYS.between(
+                    fechaEsperadaDevolucion.toLocalDate(),
+                    fechaDevolucionReal.toLocalDate()
+                );
+                double multa = diasRetraso > 0 ? diasRetraso * 5.00 : 0.00;
+
+                String updatePrestamoSQL = "UPDATE prestamo SET fecha_devolucion_real = ?, estado = 'devuelto', " +
+                                          "multa = ? WHERE id_prestamo = ?";
 
                 try (PreparedStatement updateStmt = conn.prepareStatement(updatePrestamoSQL)) {
                     updateStmt.setDate(1, fechaDevolucionReal);
-                    updateStmt.setDate(2, fechaDevolucionReal);
-                    updateStmt.setDate(3, fechaDevolucionReal);
-                    updateStmt.setInt(4, idPrestamo);
+                    updateStmt.setDouble(2, multa);
+                    updateStmt.setInt(3, idPrestamo);
                     updateStmt.executeUpdate();
                 }
 
-                // 3. Aumentar el stock
+                // Actualizar stock
                 String updateStockSQL = "UPDATE almacen SET stock = stock + 1 WHERE isbn_libro = ? AND id_biblioteca = ?";
                 try (PreparedStatement stockStmt = conn.prepareStatement(updateStockSQL)) {
                     stockStmt.setInt(1, isbnLibro);
@@ -534,6 +581,9 @@ public class Sistema_Biblioteca {
 
                 conn.commit();
                 System.out.println("Devolución registrada exitosamente y stock actualizado");
+                if (diasRetraso > 0) {
+                    System.out.printf("Multa aplicada por %d días de retraso: $%.2f%n", diasRetraso, multa);
+                }
 
             } catch (SQLException e) {
                 conn.rollback();
@@ -562,12 +612,7 @@ public class Sistema_Biblioteca {
             System.out.println("----------------------------------------------------------------");
             
             while (rs.next()) {
-                System.out.printf("%-8d %-20s %-30s %-12s %-12s%n",
-                                 rs.getInt("id_prestamo"),
-                                 rs.getString("nombre_cliente") + " " + rs.getString("apellido_cliente"),
-                                 rs.getString("nombre_libro"),
-                                 rs.getDate("fecha_prestamo"),
-                                 rs.getDate("fecha_devolucion_esperada"));
+                System.out.printf("%-8d %-20s %-30s %-12s %-12s%n", rs.getInt("id_prestamo"), rs.getString("nombre_cliente") + " " + rs.getString("apellido_cliente"), rs.getString("nombre_libro"), rs.getDate("fecha_prestamo"), rs.getDate("fecha_devolucion_esperada"));
             }
         }
     }
