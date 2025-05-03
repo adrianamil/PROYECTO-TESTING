@@ -1,13 +1,14 @@
 USAR BRANCH MASTER
 
-Chambi Loayza Cesar
-
-
-Mamani Gutierrez Miguel
+Chambi Loayza Cesar - CesarChambi
 
 
 
-Paricahua Quispe
+Mamani Gutierrez Miguel - MiguelSDK0
+
+
+
+Paricahua Quispe - gabrieL968
 
 
 
