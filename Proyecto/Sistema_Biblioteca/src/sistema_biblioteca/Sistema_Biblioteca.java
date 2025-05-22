@@ -6,6 +6,7 @@ package sistema_biblioteca;
 import java.util.Scanner;
 import java.sql.*;
 import java.time.temporal.ChronoUnit;
+import java.util.InputMismatchException;
 /**
  *
  * @author User
@@ -26,48 +27,177 @@ public class Sistema_Biblioteca {
         int opcion;
         do {
             System.out.println("\nMENU PRINCIPAL");
-            System.out.println("1. Registrar nuevo libro");
-            System.out.println("2. Registrar nuevo almacen");
-            System.out.println("3. Registrar libro en almacen");
-            System.out.println("4. Mostrar almacenes de libros");
-            System.out.println("5. Registrar nuevo prestamo");
-            System.out.println("6. Registrar devolucion");
-            System.out.println("7. Consultar prestamos activos");
-            System.out.println("8. Salir");
-            System.out.print("Seleccione una opcion: ");
-            
-            opcion = scanner.nextInt();
-            scanner.nextLine();
+            System.out.println("1. Registrar nuevo cliente");
+            System.out.println("2. Lista de clientes");
+            System.out.println("3. Registrar nuevo libro");
+            System.out.println("4. Registrar nuevo almacen");
+            System.out.println("5. Registrar libro en almacen");
+            System.out.println("6. Mostrar almacenes de libros");
+            System.out.println("7. Registrar nuevo prestamo");
+            System.out.println("8. Registrar devolucion");
+            System.out.println("9. Consultar prestamos activos");
+            System.out.println("10. Salir");
+            System.out.print("Seleccione una opcion valida: ");
+                       
+            while(true){
+                try{
+                    opcion = scanner.nextInt();
+                    scanner.nextLine();
+                    break;
+                }catch(InputMismatchException e){
+                    System.out.println("Debe de ingresar solamente numeros");
+                    System.out.print("Seleccione una opcion valida: ");
+                    scanner.next();
+                }
+            }
             
             switch(opcion) {
                 case 1:
-                    registrarLibro();
+                    registrarCliente();
                     break;
                 case 2:
-                    registrarBiblioteca();
+                    listarClientes();
                     break;
                 case 3:
-                    listarLibrosYBibliotecas();
+                    registrarLibro();
                     break;
                 case 4:
-                    mostrarLibrosDeAlmacen();
+                    registrarBiblioteca();
                     break;
                 case 5:
-                    registrarPrestamo();
+                    listarLibrosYBibliotecas();
                     break;
                 case 6:
-                    registrarDevolucion();
+                    mostrarLibrosDeAlmacen();
                     break;
                 case 7:
-                    consultarPrestamosActivos();
+                    registrarPrestamo();
                     break;
                 case 8:
+                    registrarDevolucion();
+                    break;
+                case 9:
+                    consultarPrestamosActivos();
+                    break;
+                case 10:
                     System.out.println("Saliendo del sistema...");
                     break;
                 default:
                     System.out.println("Opcion no valida");
             }
-        } while(opcion != 8);
+        } while(opcion != 10);
+    }
+    
+    private static void registrarCliente() throws SQLException {
+        System.out.println("\nREGISTRAR NUEVO USUARIO");
+        int dniCliente = 0;
+        while(true){
+            System.out.print("DNI del cliente (8 digitos): ");
+            try{
+                String dniCantidad = scanner.nextLine();
+                if (dniCantidad.length() != 8){
+                    System.out.println("Error: El DNI debe de tener exactamente 8 digitos");
+                    continue;
+                }
+                dniCliente = Integer.parseInt(dniCantidad);
+                if (validarExistencia("cliente", "dni_cliente", dniCliente)){
+                    System.out.println("Error: El DNI del cliente ya fue registrado");
+                    continue;
+                }
+                break;
+            }catch (InputMismatchException e){
+                System.out.println("Error: Debe ingresar solo numeros para el DNI");
+            }catch (NumberFormatException e){
+                System.out.println("Error: Debe ingresar solo numeros para el DNI");
+            }
+        }
+        
+        String nombreCliente = "";
+        while(true){
+            System.out.print("Ingrese el nombre del cliente: ");
+            nombreCliente = scanner.nextLine().trim();
+            if(nombreCliente.isEmpty()){
+                System.out.println("Este campo no puede estar vacio");
+            }else if (!nombreCliente.matches("^[\\p{L} ]+$")) {
+                System.out.println("El nombre solo debe contener letras");
+            }else {
+                break;
+            }
+        }
+        
+        String apellidoCliente = "";
+        while(true){
+            System.out.print("Ingrese el apellido del cliente: ");
+            apellidoCliente = scanner.nextLine().trim();
+            if(apellidoCliente.isEmpty()){
+                System.out.println("Este campo no puede estar vacio");
+            }else if (!apellidoCliente.matches("^[\\p{L} ]+$")) {
+                System.out.println("El apellido solo debe contener letras");
+            }else {
+                break;
+            }
+        }
+        
+        String direccionCliente = "";
+        while(true){
+            System.out.print("Ingrese la direccion del cliente: ");
+            direccionCliente = scanner.nextLine();
+            if(direccionCliente.isEmpty()){
+                System.out.println("Este campo no puede estar vacio");
+            }else {
+                break;
+            }
+        }
+        
+        int telefonoCliente = 0;
+        while(true){
+            System.out.print("Ingrese el telefono del cliente: ");
+            try{
+                String cantidadTelefono = scanner.nextLine();
+                if(cantidadTelefono.length() != 9){
+                    System.out.println("Este campo debe de tener 9 numeros");
+                }else {
+                    telefonoCliente = Integer.parseInt(cantidadTelefono);
+                    break;
+                }
+            }catch(NumberFormatException e){
+                System.out.println("Error: Solo se adminten numeros");
+            }
+        }
+        
+        String sql = "INSERT INTO cliente VALUES (?, ?, ?, ?, ?)";
+        
+        try (Connection conn = Conexion.getConnection()){
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setInt(1, dniCliente);
+            pstmt.setString(2, nombreCliente);
+            pstmt.setString(3, apellidoCliente);
+            pstmt.setString(4, direccionCliente);
+            pstmt.setInt(5, telefonoCliente);
+            
+            int affectedRow = pstmt.executeUpdate();
+            if (affectedRow > 0){
+                System.out.println("Se registro al cliente con exito");
+            }else{
+                System.out.println("No se pudo registrar al cliente");
+            }
+        }
+        
+    }
+    
+    private static void listarClientes() throws SQLException {
+        System.out.println("--------------------------------------- LISTADO DE CLIENTES ---------------------------------------");
+        String sql = "SELECT dni_cliente as dni_c, nombre as nombre_c, apellido as apellido_c, direccion as direccion_c, telefono as telefono_c FROM cliente";
+        try (Connection conn = Conexion.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql)){
+            
+            System.out.printf("%-10s %-22s %-22s %-22s %-9s%n", "DNI", "NOMBRE DEL CLIENTE", "APELLIDO DEL CLIENTE", "DIRECCION DEL CLIENTE", "TELEFONO DEL CLIENTE");
+            
+            while (rs.next()) {
+                System.out.printf("%-10s %-22s %-22s %-22s %-9s%n", rs.getInt("dni_c"), rs.getString("nombre_c"), rs.getString("apellido_c"), rs.getString("direccion_c"), rs.getInt("telefono_c"));
+            }
+        }
     }
     
     private static void registrarLibro() throws SQLException {
@@ -79,7 +209,7 @@ public class Sistema_Biblioteca {
             try {
                 String isbnCantidad = scanner.nextLine();
                 if (isbnCantidad.length() != 6) {
-                    System.out.println("Error: El ISBN debe tener exactamente 6 dígitos");
+                    System.out.println("Error: El ISBN debe tener exactamente 6 digitos");
                     continue;
                 }
                 isbnLibro = Integer.parseInt(isbnCantidad);
@@ -93,11 +223,27 @@ public class Sistema_Biblioteca {
             }
         }      
         
-        System.out.print("Nombre del libro: ");
-        String nombreLibro = scanner.nextLine();
-        
-        System.out.print("Nombre de la editorial: ");
-        String nombreEditorial = scanner.nextLine();
+        String nombreLibro = "";
+        while(true){
+            System.out.print("Ingrese el nombre del libro: ");
+            nombreLibro = scanner.nextLine();
+            if(nombreLibro.isEmpty()){
+                System.out.println("Este campo no puede estar vacio");
+            }else {
+                break;
+            }
+        }
+
+        String nombreEditorial = "";
+        while (true){
+            System.out.print("Ingrese el nombre de la editorial: ");
+            nombreEditorial = scanner.nextLine();
+            if (nombreEditorial.isEmpty()){
+                System.out.println("El campo no puede estar vacio");
+            }else{
+                break;
+            }
+        }
         
         String sql = "INSERT INTO libro VALUES (?, ?, ?)";
         
@@ -123,11 +269,11 @@ public class Sistema_Biblioteca {
         
         int idbiblioteca = 0;
         while (true) {
-            System.out.print("ISBN de la biblioteca (4 digitos): ");
+            System.out.print("Codigo de la biblioteca (4 digitos): ");
             try {
                 String idCantidad = scanner.nextLine();
                 if (idCantidad.length() != 4) {
-                    System.out.println("Error: El ID debe tener exactamente 4 dígitos");
+                    System.out.println("Error: El ID debe tener exactamente 4 digitos");
                     continue;
                 }
                 idbiblioteca = Integer.parseInt(idCantidad);
@@ -141,11 +287,27 @@ public class Sistema_Biblioteca {
             }
         }
         
-        System.out.print("Nombre de la biblioteca: ");
-        String nombreBiblioteca = scanner.nextLine();
-        
-        System.out.print("Direccion de la biblioteca: ");
-        String direccionBiblioteca = scanner.nextLine();
+        String nombreBiblioteca = "";
+        while(true){
+            System.out.print("Ingrese el nombre de la biblioteca: ");
+            nombreBiblioteca = scanner.nextLine();
+            if(nombreBiblioteca.isEmpty()){
+                System.out.println("Este campo no puede estar vacio");
+            }else {
+                break;
+            }
+        }
+
+        String direccionBiblioteca = "";
+        while (true){
+            System.out.print("Direccion de la biblioteca: ");
+            direccionBiblioteca = scanner.nextLine();
+            if (direccionBiblioteca.isEmpty()){
+                System.out.println("El campo no puede estar vacio");
+            }else{
+                break;
+            }
+        }
         
         String sql = "INSERT INTO biblioteca_almacen VALUES (?, ?, ?)";
         
